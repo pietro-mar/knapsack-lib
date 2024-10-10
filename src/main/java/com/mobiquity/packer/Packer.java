@@ -1,25 +1,36 @@
 package com.mobiquity.packer;
 
 import com.mobiquity.exception.APIException;
+import lombok.extern.log4j.Log4j;
+import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
+@Log4j2
 public class Packer {
 
-  // Global lists for weights and values
-  private static int maxWeight = 0; // Also make maxWeight global if needed
+  //Max Weight of a packcage
+  private static int MAX_WEIGHT_LIMIT = 100;
 
   private Packer() {
   }
 
+  public static void main(String[] args) throws APIException {
+    try{
+      pack("src/main/test/resources/example_input");
+    }catch (Exception e){
+
+    }
+  }
+
   public static String pack(String filePath) throws APIException {
     StringBuilder result = new StringBuilder();
+    log.error("Exception occurred: ", e);
+
     try (BufferedReader br = Files.newBufferedReader(Paths.get(filePath))) {
       String line;
       // Read each line and extract weights and values
@@ -32,6 +43,7 @@ public class Packer {
     } catch (Exception e) {
       throw new APIException("Error reading file: " + e.getMessage());
     }
+
     return result.toString().trim();
   }
 
@@ -43,8 +55,9 @@ public class Packer {
       validateLinePackComposition(parts, line);
       //process items per pack
       items = processItemsPack(parts, line);
+      int packMaxWeight = Integer.parseInt(parts[0].trim());
       //find the best combination of items per pack
-      return findOptimalCombination(maxWeight, items);
+      return findOptimalCombination(packMaxWeight, items);
     }catch (Exception e){
       //process will continue even if one line/item is not valid.
       //TODO put log to show message on what was the validation error
@@ -72,15 +85,17 @@ public class Packer {
   }
 
   private static void validatePackMaxWeight(String[] parts, String line) throws APIException {
-    int packMaxWeight = Integer.parseInt(getBufferPart(parts, 0));
-    if(packMaxWeight > 100 || packMaxWeight <= 0){
+    int packMaxWeight = Integer.parseInt(parts[0].trim());
+    if (packMaxWeight > MAX_WEIGHT_LIMIT || packMaxWeight <= 0) {
       throw new APIException("Invalid Pack weight on line: " + line);
     }
   }
 
   private static void validatePackItems(String[] parts, String line) throws APIException {
     String[] itemStrings = getBufferPart(parts, 1).split("\\s+");
-    //TODO validate quantity 15 items per pack
+    if(itemStrings.length <= 0 || itemStrings.length > 15){
+      throw new APIException("Invalid Pack item quantity: " + line);
+    }
   }
 
   private static ArrayList<Item> processItemsPack(String[] parts, String line) throws APIException {
@@ -121,12 +136,9 @@ public class Packer {
   }
 
   private static void validateItemIndex(String[] itemDetails, ArrayList<Item> items, String line) throws APIException {
-    Optional<Item> foundItem = items.stream().filter(i -> {
-      itemDetails[0].trim();
-      return false;
-    }).findAny();
-    if (foundItem.isPresent()) {
-      throw new APIException("Item index already found on list of items for this package, ignoring it :"+ foundItem.get().getIndex() + "on line: " + line);
+    int index = Integer.parseInt(itemDetails[0].trim());
+    if (items.stream().anyMatch(i -> i.getIndex() == index)) {
+      throw new APIException("Duplicate item index " + index + " on line: " + line);
     }
   }
 
@@ -137,9 +149,35 @@ public class Packer {
     return new Item(index, weight, cost);
   }
 
-
   // Method to find optimal items using dynamic programming
   private static String findOptimalCombination(int maxWeight, List<Item> items) {
-    return null;
+    int n = items.size();
+    int[][] dp = new int[n + 1][maxWeight + 1];
+
+    // Fill the DP table
+    for (int i = 1; i <= n; i++) {
+      Item currentItem = items.get(i - 1);
+      for (int w = 0; w <= maxWeight; w++) {
+        if (currentItem.weight <= w) {
+          dp[i][w] = Math.max(dp[i - 1][w], dp[i - 1][(int) (w - currentItem.weight)] + (int) currentItem.cost);
+        } else {
+          dp[i][w] = dp[i - 1][w];
+        }
+      }
+    }
+
+    // Backtrack to find which items to include
+    StringJoiner joiner = new StringJoiner(",");
+    int remainingWeight = maxWeight;
+    for (int i = n; i > 0 && remainingWeight > 0; i--) {
+      if (dp[i][remainingWeight] != dp[i - 1][remainingWeight]) {
+        Item selectedItem = items.get(i - 1);
+        joiner.add(String.valueOf(selectedItem.index));
+        remainingWeight -= selectedItem.weight;
+      }
+    }
+
+    // Return "-" if no items are chosen
+    return joiner.length() > 0 ? joiner.toString() : "-";
   }
 }
