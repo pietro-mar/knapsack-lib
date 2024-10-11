@@ -1,19 +1,15 @@
 package com.mobiquity.packer;
 
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
+@AllArgsConstructor
 public class Item {
     int index;
     double weight;
     double cost;
-
-    public Item(int index, double weight, double cost) {
-        this.index = index;
-        this.weight = weight;
-        this.cost = cost;
-    }
-
-    public int getIndex() {
-        return index;
-    }
 }
