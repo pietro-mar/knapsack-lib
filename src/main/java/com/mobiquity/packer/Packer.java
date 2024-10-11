@@ -36,18 +36,26 @@ public class Packer {
   }
 
   /**
-   * This method is responsible for reading the file from the classpath and returning a list of lines.
+   * This method is responsible for reading the file and returning a list of lines.
    * @param filePath the path to the file
    * @return the list of lines from the file
    * @throws APIException if there is an error on reading the file or the file not found on filepath provided.
    */
-  static List<String> readFile(String filePath) throws APIException, URISyntaxException, IOException {
-    // Load the file from the classpath using the class loader
-    var resource = Optional.ofNullable(Packer.class.getClassLoader().getResource(filePath))
-            .orElseThrow(() -> new APIException("File not found: " + filePath));
-
-    // Read all lines from the file using Files.readAllLines with UTF-8 encoding
-    return Files.readAllLines(Path.of(resource.toURI()), StandardCharsets.UTF_8);
+  static List<String> readFile(String filePath) throws APIException, IOException, URISyntaxException {
+    Path path = Path.of(filePath);
+    // Check if the file path is absolute
+    if (path.isAbsolute()) {
+      // If the path is absolute, read the file from the file system
+      if (!Files.exists(path)) {
+        throw new APIException("File not found: " + filePath);
+      }
+      return Files.readAllLines(path, StandardCharsets.UTF_8);
+    } else {
+      // If the path is not absolute, try to load it from the classpath
+      var resource = Optional.ofNullable(Packer.class.getClassLoader().getResource(filePath))
+              .orElseThrow(() -> new APIException("File not found in classpath: " + filePath));
+      return Files.readAllLines(Path.of(resource.toURI()), StandardCharsets.UTF_8);
+    }
   }
 
   /**
